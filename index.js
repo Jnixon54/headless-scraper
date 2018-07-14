@@ -6,9 +6,6 @@ const puppeteer = require('puppeteer');
 const prettyFormat = require('pretty-format');
 const { USERNAME, PASSWORD } = require('./.config');
 
-console.log(USERNAME, PASSWORD)
-
-
 // const URL = 'https://www.westelm.com/shop/furniture/sofas/all-sofas/?cm_type=lnav';
 const electricityUsageLogin = 'https://myaccount.greenmountain.com/Account/UsageHistory';
 
@@ -16,107 +13,86 @@ const app = express();
 
 app.use(json());
 
-// const getPic = async (URL) => {
-//     const browser = await puppeteer.launch({headless: false});
-//     const page = await browser.newPage();
-//     await page.setViewport({width: 1000, height: 700});
-//     await page.goto(URL);
-//     // await page.screenshot({path: 'test.png'});
+let seriesData = {
+    series_usage_cost : [],
+    series_usage_kWh : [],
+    series_usage_temp : [],
+    series_usage_ticks : []
+};
 
-//     await browser.close();
-// };
-
-
-
-const scrape = async (url) => {
+const scrape = async () => {
+    console.log('Launching Puppeteer...');
     const browser = await puppeteer.launch({headless: false});
     const page = await browser.newPage();
 
     const logIn = async (url) => {
+        console.log('Logging In...');
         await page.type('#UserName', USERNAME);
         await page.type('#Password', PASSWORD);
+        const navPromise = page.waitForNavigation({ waitUntil: 'load' });
+
+        console.log('Submitting Credentials...');
         await page.click('#submit');
-    
+        await navPromise;
+
+        console.log('Navigation complete...');
+        return;
     };
     
     const checkForModal = () => {
-        console.log(page)
         const result = page.evaluate(() => {
-            let intervalCount = 0;
-            let interval = window.setInterval(() => {
+            let handleModal = () => {
                 let modal = document.querySelector('#mcx_decline');
-                console.log(modal);
                 if (modal) {
-                    document.querySelector('#mcx_decline').click();
-                    window.clearInterval(interval);
+                    console.log('Modal Detected...');
+                    return true;
                 }
                 intervalCount++;
-                if (intervalCount === 5) window.clearInterval(interval);
-            }, 1000);
+                console.log('Count: ', intervalCount);
+
+                if (intervalCount === 5) {
+                    return true;
+                }
+
+                return false;
+            };
+
+            let intervalCount = 0;
+            let waitForModalPromise = new Promise((resolve, reject) => {
+                let interval = window.setInterval(() => {
+                    if (handleModal()) {
+                        window.clearInterval(interval);
+                        resolve();
+                        document.querySelector('#mcx_decline').click();
+                    };
+                }, 1000);
+            });
+            return waitForModalPromise;
         });
         return result;
     
     }
-
+    console.log('Navigating to login page...');
     await page.goto(electricityUsageLogin);
-    await page.waitFor(1000);
+    // await page.waitFor(3000);
+    console.log('Checking for modal...')
     await checkForModal();
     await logIn(electricityUsageLogin);
 
-    
+    seriesData = await page.evaluate(() => {
+        let series = {};
+        series.series_usage_cost = window.series_usage_cost;
+        series.series_usage_kWh = window.series_usage_kWh;
+        series.series_usage_temp = window.series_usage_temp;
+        series.series_usage_ticks = window.series_usage_ticks;
+        return { ...series };
+    });
+
+    console.log(seriesData);
 };
 
-// const scrape = async (URL) => {
-//     const browser = await puppeteer.launch({headless: false});
-//     const page = await browser.newPage();
-//     await page.goto(URL, {
-//         waitUntil: 'load',
-//         // dumpio: true
-//     });
-//     await page.click('#shop > div.stickyOverlayScroll.overlayScroll > div > a.stickyOverlayMinimizeButton');
-//     const result = await page.evaluate(() => {
-//         let data = [];
-//         let products = document.querySelectorAll('#subCatListContainer > ul > li');
-//         // let element = document.querySelector('.nav-menu');
-//         // console.log('doc', element)
-//         console.log(products)
-
-//         products.forEach((product) => {
-//             let price = '';
-//             let name = '';
-
-//             let isDiscounted = !eval("product.querySelectorAll('.price-standard').length > 0")
-//             if (product.querySelector('.product-name')) {
-//                 name = product.querySelector('.product-name').innerText;
-//                 console.log(name)
-                
-//             }
-//             if (!isDiscounted) {
-//                 price = product.querySelector('.price-amount').innerText;
-//             } else {
-//                 price =' $$$'
-//             }
-
-//             // if (product.querySelectorAll('.price-state')) {
-//             //     let priceState = product.querySelectorAll('.price-state');
-//             //     priceState[0].querySelector('.price-amount')
-//             // }
-//             data.push({name, price, isDiscounted});
-//             // let price = element.
-//         });
-
-//         return data;
-//     });
-//     // #subCatListContainer > ul > li:nth-child(7) > span > span.price-state.price-sale > span:nth-child(2)
-//     return result;
-//     // await browser.close();
-// }
-// scrape(URL).then((data) => {
-//     console.log(prettyFormat(data));
-// });
-
-scrape('home');
+scrape();
 
 // axios.get(URL).then(res => console.log('rest', res))
 
-// app.listen(3000, () => console.log('Server Running on port 3000'));
+app.listen(3000, () => console.log('Server Running on port 3000'));
