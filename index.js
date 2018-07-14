@@ -3,10 +3,8 @@ const { json } = require ('body-parser');
 const cors = require('cors');
 const axios = require('axios');
 const puppeteer = require('puppeteer');
-const prettyFormat = require('pretty-format');
 const { USERNAME, PASSWORD } = require('./.config');
 
-// const URL = 'https://www.westelm.com/shop/furniture/sofas/all-sofas/?cm_type=lnav';
 const electricityUsageLogin = 'https://myaccount.greenmountain.com/Account/UsageHistory';
 
 const app = express();
@@ -92,7 +90,5 @@ const scrape = async () => {
 };
 
 scrape();
-
-// axios.get(URL).then(res => console.log('rest', res))
 
 app.listen(3000, () => console.log('Server Running on port 3000'));
