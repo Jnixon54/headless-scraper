@@ -91,4 +91,6 @@ const scrape = async () => {
 
 scrape();
 
+// Endpoints
+
 app.listen(3000, () => console.log('Server Running on port 3000'));
